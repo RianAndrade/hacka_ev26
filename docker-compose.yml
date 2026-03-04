@@ -1,0 +1,45 @@
+services:
+  term_epidemic_db:
+    image: postgres:16
+    container_name: term_epidemic_db
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - term_epidemic_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - term_epidemic_net
+
+  term_epidemic_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: term_epidemic_api
+    env_file:
+      - .env
+    depends_on:
+      term_epidemic_db:
+        condition: service_healthy
+    ports:
+      - "${DJANGO_PORT}:8000"
+    volumes:
+      - ./src:/app
+    networks:
+      - term_epidemic_net
+
+volumes:
+  term_epidemic_postgres_data:
+
+networks:
+  term_epidemic_net:
+    driver: bridge
