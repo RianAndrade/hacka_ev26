@@ -13,3 +13,6 @@ back-logs:
 
 migrations:
 	docker compose exec term_epidemic_api sh -lc "python manage.py makemigrations && python manage.py migrate"
+
+superuser:
+	docker compose exec term_epidemic_api sh -lc "python manage.py createsuperuser"
