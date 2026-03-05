@@ -14,6 +14,9 @@ from rest_framework import status
 
 from arbovirus.task import celery_test_task
 
+from arbovirus.tasks.train_model_task import train_dengue_model_task
+
+
 
 OPTIMAL_MIN = 21.0
 OPTIMAL_MAX = 30.0
@@ -198,5 +201,18 @@ class CeleryTestAPIView(APIView):
                 "task_id": task.id,
                 "status": "task sent to celery"
             },
+            status=status.HTTP_202_ACCEPTED,
+        )
+    
+
+
+class TrainModelAPIView(APIView):
+    def post(self, request):
+        municipality = request.data.get("municipality_code")
+
+        task = train_dengue_model_task.delay(municipality)
+
+        return Response(
+            {"task_id": task.id},
             status=status.HTTP_202_ACCEPTED,
         )
