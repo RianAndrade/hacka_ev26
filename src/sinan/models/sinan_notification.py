@@ -22,54 +22,71 @@ class SinanNotification(models.Model):
     - case_outcome: Case outcome/evolution (e.g., cured, death, under follow-up).
     - age_years: Patient age in years at the time of notification.
     """
+    notification_date = models.DateField(
+        null=True
+    )
 
-    notification_date = models.DateField()
+    notification_epidemiological_week = models.PositiveSmallIntegerField(
+        null=True
+    )
 
-    notification_epidemiological_week = models.PositiveSmallIntegerField()
-
-    notification_year = models.PositiveSmallIntegerField()
+    notification_year = models.PositiveSmallIntegerField(
+        null=True
+    )
 
     disease_code = models.CharField(
-        max_length=50
+        max_length=50,
+        null=True
     )
 
     notification_municipality_code = models.CharField(
-        max_length=20
+        max_length=20,
+        null=True
     )
 
     health_region_code = models.CharField(
-        max_length=20
+        max_length=20,
+        null=True
     )
 
     reporting_health_unit_code = models.CharField(
-        max_length=20
+        max_length=20,
+        null=True
     )
 
     sex = models.CharField(
-        max_length=20
+        max_length=20,
+        null=True
     )
 
     race_color = models.CharField(
-        max_length=30
+        max_length=30,
+        null=True
     )
 
     education_level = models.CharField(
-        max_length=50
+        max_length=50,
+        null=True
     )
 
     residence_municipality_code = models.CharField(
-        max_length=20
+        max_length=20,
+        null=True
     )
 
     residence_health_region_code = models.CharField(
-        max_length=20
+        max_length=20,
+        null=True
     )
 
     case_outcome = models.CharField(
-        max_length=50
+        max_length=50,
+        null=True
     )
 
-    age_years = models.PositiveSmallIntegerField()
+    age_years = models.PositiveSmallIntegerField(
+        null=True
+    )
 
     class Meta:
         db_table = "sinan_notification"
