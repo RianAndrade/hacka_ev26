@@ -8,7 +8,11 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
-from .models import SinanNotification, InmetWeatherObservation
+from sinan.models.sinan_notification import SinanNotification
+from inmet.models.inmet import InmetWeatherObservation
+from rest_framework import status
+
+from arbovirus.task import celery_test_task
 
 
 OPTIMAL_MIN = 21.0
@@ -183,4 +187,16 @@ class ArbovirusRiskView(APIView):
                 "explanations": explanations,
                 "observed_next_month_cases": observed_next,
             }
+        )
+
+
+class CeleryTestAPIView(APIView):
+    def post(self, request):
+        task = celery_test_task.delay()
+        return Response(
+            {
+                "task_id": task.id,
+                "status": "task sent to celery"
+            },
+            status=status.HTTP_202_ACCEPTED,
         )

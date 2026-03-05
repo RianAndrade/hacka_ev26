@@ -1,8 +1,8 @@
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/", include("sinan.urls")),
     path("api/inmet/", include("inmet.urls")),
+    path("api/arbovirus/", include("arbovirus.urls")),
 ]
