@@ -66,10 +66,7 @@ def _to_date_ddmmyyyy(value: Any) -> Optional[datetime.date]:
 
 
 def _extract_epi_week(value: Any) -> Optional[int]:
-    """
-    No seu CSV, SEM_NOT vem como YYYYWW (ex.: 201923).
-    Seu model usa PositiveSmallIntegerField, então salvamos só WW (1..53).
-    """
+
     s = _clean_str(value)
     if s is None:
         return None
@@ -99,7 +96,6 @@ class SinanNotificationCSVImportView(APIView):
         to_create = []
         errors = []
 
-        # Lê o CSV como texto (suporta arquivos grandes sem carregar tudo na memória)
         wrapper = TextIOWrapper(upload.file, encoding="utf-8", errors="replace")
         reader = csv.DictReader(wrapper)
 
@@ -136,9 +132,8 @@ class SinanNotificationCSVImportView(APIView):
             created += len(to_create)
             to_create = []
 
-        # Se quiser tudo atômico (tudo ou nada), mantenha atomic()
         with transaction.atomic():
-            for row_index, row in enumerate(reader, start=2):  # 2 por causa do header
+            for row_index, row in enumerate(reader, start=2):
                 try:
                     obj = SinanNotification(
                         notification_date=_to_date_ddmmyyyy(row.get("DT_NOTIFIC")),
@@ -172,7 +167,6 @@ class SinanNotificationCSVImportView(APIView):
 
             flush()
 
-            # Se for dry-run, desfaz tudo no fim
             if dry_run:
                 transaction.set_rollback(True)
 
