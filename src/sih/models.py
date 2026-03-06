@@ -37,6 +37,9 @@ class HospitalOccupancyPrediction(models.Model):
     real_total = models.IntegerField(null=True, blank=True)
     estimated_total = models.FloatField()
 
+    real_avg_length_of_stay = models.FloatField(null=True, blank=True)
+    estimated_avg_length_of_stay = models.FloatField(null=True, blank=True)
+
     updated_at = models.DateTimeField(auto_now=True, db_index=True)
 
     class Meta:
@@ -53,10 +56,6 @@ class HospitalOccupancyPrediction(models.Model):
 
 
 class HospitalOccupancyPredictionRun(models.Model):
-    """
-    One row per execution (e.g., every Sunday).
-    Groups all audit predictions produced in this run.
-    """
     run_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     train_from = models.IntegerField(null=True, blank=True)
@@ -70,6 +69,10 @@ class HospitalOccupancyPredictionRun(models.Model):
     rmse = models.FloatField(null=True, blank=True)
     r2 = models.FloatField(null=True, blank=True)
 
+    los_mae = models.FloatField(null=True, blank=True)
+    los_rmse = models.FloatField(null=True, blank=True)
+    los_r2 = models.FloatField(null=True, blank=True)
+
     rows_count = models.IntegerField(null=True, blank=True)
 
     class Meta:
@@ -80,9 +83,6 @@ class HospitalOccupancyPredictionRun(models.Model):
 
 
 class HospitalOccupancyPredictionAudit(models.Model):
-    """
-    Historical snapshot of predictions for auditing.
-    """
     run = models.ForeignKey(
         HospitalOccupancyPredictionRun,
         on_delete=models.CASCADE,
@@ -95,6 +95,9 @@ class HospitalOccupancyPredictionAudit(models.Model):
 
     real_total = models.IntegerField(null=True, blank=True)
     estimated_total = models.FloatField()
+
+    real_avg_length_of_stay = models.FloatField(null=True, blank=True)
+    estimated_avg_length_of_stay = models.FloatField(null=True, blank=True)
 
     class Meta:
         db_table = "hospital_occupancy_predictions_audit"
