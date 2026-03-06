@@ -69,7 +69,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--horizon-days",
             type=int,
-            default=30,
+            default=90,
         )
         parser.add_argument(
             "--date-init",
