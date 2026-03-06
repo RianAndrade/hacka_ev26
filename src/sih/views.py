@@ -2,17 +2,19 @@ import csv
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from celery.result import AsyncResult
 from django.db import transaction
+from django.db.models import Avg, Case, Count, DurationField, ExpressionWrapper, F, Q, Sum, When
+from django.db.models.functions import TruncMonth, TruncWeek
+from django.urls import reverse
+from django.views.generic import TemplateView
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from celery.result import AsyncResult
 
 from sih.tasks import run_hospital_occupancy_forecast
 from .models import HospitalAdmission, HospitalOccupancyPrediction
-from django.urls import reverse
-from django.views.generic import TemplateView
 
 def _parse_date(value: str):
     v = (value or "").strip()
@@ -263,4 +265,309 @@ class HospitalOccupancyDashboardView(TemplateView):
         context = super().get_context_data(**kwargs)
         context["available_hospitals_url"] = reverse("hospital-occupancy-hospitals")
         context["predictions_url"] = reverse("hospital-occupancy-predictions")
+        context["forecast_dashboard_url"] = reverse("hospital-occupancy-dashboard")
+        context["historical_dashboard_url"] = reverse("hospital-admission-historical-dashboard")
+        return context
+
+def _distinct_non_empty_values(queryset, field_name: str):
+    return list(
+        queryset.exclude(**{f"{field_name}__isnull": True})
+        .exclude(**{f"{field_name}__exact": ""})
+        .values_list(field_name, flat=True)
+        .distinct()
+        .order_by(field_name)
+    )
+
+
+def _parse_optional_int(value):
+    v = (value or "").strip()
+    if not v:
+        return None
+    try:
+        return int(v)
+    except ValueError:
+        return None
+
+
+class HospitalAdmissionHistoricalFilterOptionsView(APIView):
+
+    def get(self, request):
+        base_queryset = HospitalAdmission.objects.all()
+
+        years = list(
+            base_queryset.values_list("admission_date__year", flat=True)
+            .distinct()
+            .order_by("admission_date__year")
+        )
+
+        sexes = _distinct_non_empty_values(base_queryset, "patient_sex")
+        diagnosis_codes = _distinct_non_empty_values(
+            base_queryset,
+            "primary_diagnosis_icd10_code",
+        )
+        admission_types = _distinct_non_empty_values(base_queryset, "admission_type")
+        specialty_codes = _distinct_non_empty_values(
+            base_queryset,
+            "bed_or_admission_specialty_code",
+        )
+        facility_codes = _distinct_non_empty_values(
+            base_queryset,
+            "health_facility_registry_code",
+        )
+
+        return Response(
+            {
+                "years": [year for year in years if year is not None],
+                "sexes": sexes,
+                "diagnosis_codes": diagnosis_codes,
+                "admission_types": admission_types,
+                "specialty_codes": specialty_codes,
+                "facility_codes": facility_codes,
+                "period_options": [
+                    {"value": "week", "label": "Semanal"},
+                    {"value": "month", "label": "Mensal"},
+                ],
+                "death_options": [
+                    {"value": "true", "label": "Sim"},
+                    {"value": "false", "label": "Não"},
+                ],
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class HospitalAdmissionHistoricalSummaryView(APIView):
+
+    def get(self, request):
+        year = _parse_optional_int(request.query_params.get("year"))
+        period = (request.query_params.get("period") or "week").strip().lower()
+
+        patient_sex = (request.query_params.get("patient_sex") or "").strip()
+        diagnosis_code = (request.query_params.get("diagnosis_code") or "").strip()
+        admission_type = (request.query_params.get("admission_type") or "").strip()
+        specialty_code = (request.query_params.get("specialty_code") or "").strip()
+        facility_code = (request.query_params.get("facility_code") or "").strip()
+        death_during_admission = (
+            request.query_params.get("death_during_admission") or ""
+        ).strip().lower()
+
+        min_stay_days = _parse_optional_int(request.query_params.get("min_stay_days"))
+        max_stay_days = _parse_optional_int(request.query_params.get("max_stay_days"))
+        min_icu_days = _parse_optional_int(request.query_params.get("min_icu_days"))
+        max_icu_days = _parse_optional_int(request.query_params.get("max_icu_days"))
+
+        weeks_count = _parse_optional_int(request.query_params.get("weeks_count"))
+        start_month = _parse_optional_int(request.query_params.get("start_month"))
+
+        if year is None:
+            return Response(
+                {"detail": "Query param 'year' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not facility_code:
+            return Response(
+                {"detail": "Query param 'facility_code' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if period not in {"week", "month"}:
+            return Response(
+                {"detail": "Query param 'period' must be 'week' or 'month'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if period == "week":
+            if weeks_count is None or weeks_count <= 0:
+                return Response(
+                    {
+                        "detail": (
+                            "Query param 'weeks_count' is required and must be "
+                            "greater than 0 when period='week'."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if start_month is None or start_month < 1 or start_month > 12:
+                return Response(
+                    {
+                        "detail": (
+                            "Query param 'start_month' is required and must be "
+                            "between 1 and 12 when period='week'."
+                        )
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        queryset = HospitalAdmission.objects.filter(
+            admission_date__year=year,
+            health_facility_registry_code=facility_code,
+        )
+
+        if period == "week" and start_month is not None:
+            queryset = queryset.filter(admission_date__month__gte=start_month)
+
+        if patient_sex:
+            queryset = queryset.filter(patient_sex=patient_sex)
+
+        if diagnosis_code:
+            queryset = queryset.filter(primary_diagnosis_icd10_code=diagnosis_code)
+
+        if admission_type:
+            queryset = queryset.filter(admission_type=admission_type)
+
+        if specialty_code:
+            queryset = queryset.filter(bed_or_admission_specialty_code=specialty_code)
+
+        if death_during_admission == "true":
+            queryset = queryset.filter(death_during_admission=True)
+        elif death_during_admission == "false":
+            queryset = queryset.filter(death_during_admission=False)
+
+        queryset = queryset.annotate(
+            stay_duration=Case(
+                When(
+                    discharge_date__isnull=False,
+                    then=ExpressionWrapper(
+                        F("discharge_date") - F("admission_date"),
+                        output_field=DurationField(),
+                    ),
+                ),
+                default=None,
+                output_field=DurationField(),
+            )
+        )
+
+        if min_stay_days is not None:
+            queryset = queryset.filter(stay_duration__gte=timedelta(days=min_stay_days))
+
+        if max_stay_days is not None:
+            queryset = queryset.filter(stay_duration__lte=timedelta(days=max_stay_days))
+
+        if min_icu_days is not None:
+            queryset = queryset.filter(intensive_care_total_days__gte=min_icu_days)
+
+        if max_icu_days is not None:
+            queryset = queryset.filter(intensive_care_total_days__lte=max_icu_days)
+
+        period_trunc = (
+            TruncWeek("admission_date")
+            if period == "week"
+            else TruncMonth("admission_date")
+        )
+
+        grouped_queryset = (
+            queryset.annotate(period_start=period_trunc)
+            .values("period_start")
+            .annotate(
+                occurrences=Count("record_identifier"),
+                avg_stay_duration=Avg("stay_duration"),
+                deaths=Count(
+                    "record_identifier",
+                    filter=Q(death_during_admission=True),
+                ),
+                total_amount_paid=Sum("total_amount_paid_brl"),
+            )
+            .order_by("period_start")
+        )
+
+        grouped_list = list(grouped_queryset)
+
+        if period == "week" and weeks_count is not None:
+            grouped_list = grouped_list[:weeks_count]
+
+        periods = {}
+        selected_period_keys = []
+
+        for item in grouped_list:
+            avg_stay_duration = item["avg_stay_duration"]
+            avg_stay_days = None
+
+            if avg_stay_duration is not None:
+                avg_stay_days = round(avg_stay_duration.total_seconds() / 86400, 2)
+
+            total_amount_paid = item["total_amount_paid"]
+            if total_amount_paid is not None:
+                total_amount_paid = float(total_amount_paid)
+
+            period_start = item["period_start"]
+            period_key = (
+                period_start.isoformat()
+                if hasattr(period_start, "isoformat")
+                else str(period_start)
+            )
+
+            selected_period_keys.append(period_start)
+
+            periods[period_key] = {
+                "occurrences": item["occurrences"],
+                "avg_length_of_stay": avg_stay_days,
+                "deaths": item["deaths"],
+                "total_amount_paid": round(total_amount_paid or 0, 2),
+            }
+
+        summary_queryset = queryset
+
+        if selected_period_keys:
+            summary_queryset = queryset.annotate(period_start=period_trunc).filter(
+                period_start__in=selected_period_keys
+            )
+        elif period == "week":
+            summary_queryset = queryset.none()
+
+        overall = summary_queryset.aggregate(
+            total_occurrences=Count("record_identifier"),
+            avg_stay_duration=Avg("stay_duration"),
+            total_deaths=Count(
+                "record_identifier",
+                filter=Q(death_during_admission=True),
+            ),
+            total_amount_paid=Sum("total_amount_paid_brl"),
+        )
+
+        overall_avg_stay = overall["avg_stay_duration"]
+        overall_avg_stay_days = None
+
+        if overall_avg_stay is not None:
+            overall_avg_stay_days = round(overall_avg_stay.total_seconds() / 86400, 2)
+
+        return Response(
+            {
+                "year": year,
+                "period": period,
+                "filters": {
+                    "patient_sex": patient_sex or None,
+                    "diagnosis_code": diagnosis_code or None,
+                    "admission_type": admission_type or None,
+                    "specialty_code": specialty_code or None,
+                    "facility_code": facility_code,
+                    "death_during_admission": death_during_admission or None,
+                    "min_stay_days": min_stay_days,
+                    "max_stay_days": max_stay_days,
+                    "min_icu_days": min_icu_days,
+                    "max_icu_days": max_icu_days,
+                    "weeks_count": weeks_count,
+                    "start_month": start_month,
+                },
+                "summary": {
+                    "total_occurrences": overall["total_occurrences"] or 0,
+                    "avg_length_of_stay": overall_avg_stay_days,
+                    "total_deaths": overall["total_deaths"] or 0,
+                    "total_amount_paid": round(float(overall["total_amount_paid"] or 0), 2),
+                },
+                "periods": periods,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class HospitalAdmissionHistoricalDashboardView(TemplateView):
+    template_name = "sih/hospital_occupancy_historical_dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["filter_options_url"] = reverse("hospital-admission-historical-filter-options")
+        context["historical_summary_url"] = reverse("hospital-admission-historical-summary")
+        context["forecast_dashboard_url"] = reverse("hospital-occupancy-dashboard")
+        context["historical_dashboard_url"] = reverse("hospital-admission-historical-dashboard")
         return context

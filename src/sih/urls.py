@@ -8,42 +8,60 @@ from .views import (
     HospitalOccupancyPredictionByHospitalView,
     HospitalOccupancyAvailableHospitalsView,
     HospitalOccupancyDashboardView,
+    HospitalAdmissionHistoricalFilterOptionsView,
+    HospitalAdmissionHistoricalSummaryView,
+    HospitalAdmissionHistoricalDashboardView,
 )
 
 urlpatterns = [
     path(
         "hospital-admissions/import-csv/",
         HospitalAdmissionCsvImportView.as_view(),
-        name="hospital-admissions-import-csv",
+        name="hospital-admission-import-csv",
     ),
     path(
-        "hospital-occupancy/forecast/run/",
+        "hospital-occupancy-forecast/run/",
         RunHospitalOccupancyForecastView.as_view(),
-        name="hospital-occupancy-forecast-run",
+        name="run-hospital-occupancy-forecast",
     ),
     path(
-        "hospital-occupancy/forecast/status/<str:task_id>/",
+        "hospital-occupancy-forecast/status/<str:task_id>/",
         HospitalOccupancyForecastStatusView.as_view(),
         name="hospital-occupancy-forecast-status",
     ),
     path(
-        "hospital-occupancy/forecast/",
+        "hospital-occupancy-forecast/",
         HospitalOccupancyForecastView.as_view(),
         name="hospital-occupancy-forecast",
     ),
     path(
-        "hospital-occupancy/predictions/",
+        "hospital-occupancy-predictions/",
         HospitalOccupancyPredictionByHospitalView.as_view(),
         name="hospital-occupancy-predictions",
     ),
     path(
-        "hospital-occupancy/hospitals/",
+        "hospital-occupancy-hospitals/",
         HospitalOccupancyAvailableHospitalsView.as_view(),
         name="hospital-occupancy-hospitals",
     ),
     path(
-        "hospital-occupancy/dashboard/",
+        "hospital-occupancy-dashboard/",
         HospitalOccupancyDashboardView.as_view(),
         name="hospital-occupancy-dashboard",
+    ),
+    path(
+        "hospital-admissions/historical/filter-options/",
+        HospitalAdmissionHistoricalFilterOptionsView.as_view(),
+        name="hospital-admission-historical-filter-options",
+    ),
+    path(
+        "hospital-admissions/historical/summary/",
+        HospitalAdmissionHistoricalSummaryView.as_view(),
+        name="hospital-admission-historical-summary",
+    ),
+    path(
+        "hospital-admissions/historical/dashboard/",
+        HospitalAdmissionHistoricalDashboardView.as_view(),
+        name="hospital-admission-historical-dashboard",
     ),
 ]
