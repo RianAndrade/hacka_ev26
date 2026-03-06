@@ -89,15 +89,25 @@ CELERY_RESULT_BACKEND=redis://redis:6379/1
 
 ### 1. Clonar o repositório
 
-git clone git@github.com:RianAndrade/hackadashs.git
+```
+git@github.com:RianAndrade/hacka_ev26.git
+
+```
 
 ### 2. Entrar na pasta do projeto
 
-cd hackadashs
+
+```
+cd hacka_ev26
+
+```
 
 ### 3. Subir os containers
 
+```
 docker compose up --build
+
+```
 
 Na primeira execução, o processo pode demorar alguns minutos, pois o Docker irá:
 
@@ -110,12 +120,17 @@ Na primeira execução, o processo pode demorar alguns minutos, pois o Docker ir
 
 Quando a inicialização terminar, a seguinte mensagem aparecerá no terminal:
 
+
+```
 | March 06, 2026 - 14:26:35  
 | Django version 6.0.3, using settings 'config.settings'  
 | Starting development server at http://0.0.0.0:8000/  
 | Quit the server with CONTROL-C.
 
+```
+
 Durante a inicialização, o Docker automaticamente irá:
+```
 
 - iniciar o PostgreSQL  
 - iniciar o Redis  
@@ -130,13 +145,13 @@ Durante a inicialização, o Docker automaticamente irá:
 Após os containers estarem em execução, o sistema poderá ser acessado pelos seguintes endereços:
 
 ### Dashboard de previsão
-http://localhost:8000/hospital-occupancy-dashboard/
+`http://localhost:8000/hospital-occupancy-dashboard/`
 
 ### Dashboard histórico
-http://localhost:8000/hospital-admissions/historical/dashboard/
+`http://localhost:8000/hospital-admissions/historical/dashboard/`
 
 ### Área administrativa
-http://localhost:8000/hospital-occupancy-admin/
+`http://localhost:8000/hospital-occupancy-admin/`
 
 ---
 
