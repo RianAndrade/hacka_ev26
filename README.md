@@ -1,7 +1,7 @@
-# TermEpidemi
-**TermEpidemi** é uma aplicação desenvolvida para enfrentar um problema recorrente na gestão de saúde pública: **a dificuldade de antecipar picos de demanda hospitalar**.
+# hackadashs
+**hackadashs** é uma aplicação desenvolvida para enfrentar um problema recorrente na gestão de saúde pública: **a dificuldade de antecipar picos de demanda hospitalar**.
 Em muitos momentos do ano — especialmente durante surtos epidemiológicos, períodos sazonais ou eventos inesperados — hospitais podem enfrentar aumentos bruscos no número de internações. Quando esses aumentos não são previstos com antecedência, o sistema de saúde pode sofrer com **superlotação, falta de leitos e dificuldade de planejamento de recursos**.
-O TermEpidemi busca reduzir esse problema utilizando **dados históricos de internações hospitalares para identificar padrões e gerar previsões de ocupação hospitalar**. A partir dessas informações, gestores podem ter uma visão antecipada de possíveis aumentos na demanda, permitindo **planejamento mais eficiente da capacidade hospitalar e melhor distribuição de recursos**.
+O hackadashs busca reduzir esse problema utilizando **dados históricos de internações hospitalares para identificar padrões e gerar previsões de ocupação hospitalar**. A partir dessas informações, gestores podem ter uma visão antecipada de possíveis aumentos na demanda, permitindo **planejamento mais eficiente da capacidade hospitalar e melhor distribuição de recursos**.
 O sistema foi desenvolvido no contexto de um **hackathon**, priorizando rapidez de execução, facilidade de teste e visualização clara dos resultados.
 A plataforma permite importar dados hospitalares, analisar históricos de internação e gerar previsões de admissões por unidade de saúde. Dessa forma, auxilia na identificação de padrões e na **antecipação de picos de demanda hospitalar**, contribuindo para um planejamento mais eficiente da gestão de saúde.
 
@@ -91,11 +91,11 @@ CELERY_RESULT_BACKEND=redis://redis:6379/1
 
 ### 1. Clonar o repositório
 
-git clone git@github.com:RianAndrade/TermEpidemi.git
+git clone git@github.com:RianAndrade/hackadashs.git
 
 ### 2. Entrar na pasta do projeto
 
-cd TermEpidemi
+cd hackadashs
 
 ### 3. Subir os containers
 
