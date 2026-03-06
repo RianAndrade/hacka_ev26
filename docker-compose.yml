@@ -1,7 +1,7 @@
 services:
-  term_epidemic_db:
+  hackadashs_db:
     image: postgres:16
-    container_name: term_epidemic_db
+    container_name: hackadashs_db
     env_file:
       - .env
     environment:
@@ -11,32 +11,32 @@ services:
     ports:
       - "${POSTGRES_PORT}:5432"
     volumes:
-      - term_epidemic_postgres_data:/var/lib/postgresql/data
+      - hackadashs_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
     networks:
-      - term_epidemic_net
+      - hackadashs_net
 
   redis:
     image: redis:7-alpine
-    container_name: term_epidemic_redis
+    container_name: hackadashs_redis
     ports:
       - "6379:6379"
     networks:
-      - term_epidemic_net
+      - hackadashs_net
 
-  term_epidemic_api:
+  hackadashs_api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: term_epidemic_api
+    container_name: hackadashs_api
     env_file:
       - .env
     depends_on:
-      term_epidemic_db:
+      hackadashs_db:
         condition: service_healthy
       redis:
         condition: service_started
@@ -46,17 +46,17 @@ services:
       - ./src:/app
     command: sh -lc "python manage.py migrate && python manage.py bootstrap_hospital_data && python manage.py runserver 0.0.0.0:8000"
     networks:
-      - term_epidemic_net
+      - hackadashs_net
 
   celery_worker:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: term_epidemic_celery_worker
+    container_name: hackadashs_celery_worker
     env_file:
       - .env
     depends_on:
-      term_epidemic_db:
+      hackadashs_db:
         condition: service_healthy
       redis:
         condition: service_started
@@ -64,11 +64,11 @@ services:
       - ./src:/app
     command: sh -lc "celery -A config worker -l info"
     networks:
-      - term_epidemic_net
+      - hackadashs_net
 
 volumes:
-  term_epidemic_postgres_data:
+  hackadashs_postgres_data:
 
 networks:
-  term_epidemic_net:
+  hackadashs_net:
     driver: bridge

@@ -9,10 +9,10 @@ restart:
 	docker compose up -d --build
 
 back-logs:
-	docker compose logs -f term_epidemic_api
+	docker compose logs -f hackadashs_api
 
 migrations:
-	docker compose exec term_epidemic_api sh -lc "python manage.py makemigrations && python manage.py migrate"
+	docker compose exec hackadashs_api sh -lc "python manage.py makemigrations && python manage.py migrate"
 
 superuser:
-	docker compose exec term_epidemic_api sh -lc "python manage.py createsuperuser"
+	docker compose exec hackadashs_api sh -lc "python manage.py createsuperuser"

@@ -73,13 +73,13 @@ DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
 
 DJANGO_PORT=8000
 
-POSTGRES_HOST=term_epidemic_db
+POSTGRES_HOST=hackadashs_db
 POSTGRES_PORT=5432
-POSTGRES_DB=term_epidemic
-POSTGRES_USER=term_epidemic
-POSTGRES_PASSWORD=term_epidemic
+POSTGRES_DB=hackadashs
+POSTGRES_USER=hackadashs
+POSTGRES_PASSWORD=hackadashs
 
-DATABASE_URL=postgresql://term_epidemic:term_epidemic@db:5432/term_epidemic
+DATABASE_URL=postgresql://hackadashs:hackadashs@db:5432/hackadashs
 
 CELERY_BROKER_URL=redis://redis:6379/0
 CELERY_RESULT_BACKEND=redis://redis:6379/1
