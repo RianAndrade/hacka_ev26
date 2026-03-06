@@ -91,7 +91,7 @@ CELERY_RESULT_BACKEND=redis://redis:6379/1
 ### 1. Clonar o repositório
 
 ```
-git@github.com:RianAndrade/hacka_ev26.git
+git clone git@github.com:RianAndrade/hacka_ev26.git
 ```
 
 ### 2. Entrar na pasta do projeto
