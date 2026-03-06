@@ -66,6 +66,7 @@ Isso permite iniciar o sistema rapidamente sem necessidade de configuração adi
 
 Exemplo de configuração:
 
+```
 DJANGO_SECRET_KEY=django-insecure-6q3n9r2f0k8m1v5p7s4t9x2y6z1a3b8c5d0e7f2h9j4k1m  
 DJANGO_DEBUG=1  
 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1  
@@ -82,7 +83,7 @@ DATABASE_URL=postgresql://term_epidemic:term_epidemic@db:5432/term_epidemic
 
 CELERY_BROKER_URL=redis://redis:6379/0  
 CELERY_RESULT_BACKEND=redis://redis:6379/1  
-
+```
 ---
 
 # 🐳 Como rodar o projeto
@@ -91,7 +92,6 @@ CELERY_RESULT_BACKEND=redis://redis:6379/1
 
 ```
 git@github.com:RianAndrade/hacka_ev26.git
-
 ```
 
 ### 2. Entrar na pasta do projeto
@@ -99,14 +99,12 @@ git@github.com:RianAndrade/hacka_ev26.git
 
 ```
 cd hacka_ev26
-
 ```
 
 ### 3. Subir os containers
 
 ```
 docker compose up --build
-
 ```
 
 Na primeira execução, o processo pode demorar alguns minutos, pois o Docker irá:
@@ -126,11 +124,9 @@ Quando a inicialização terminar, a seguinte mensagem aparecerá no terminal:
 | Django version 6.0.3, using settings 'config.settings'  
 | Starting development server at http://0.0.0.0:8000/  
 | Quit the server with CONTROL-C.
-
 ```
 
 Durante a inicialização, o Docker automaticamente irá:
-```
 
 - iniciar o PostgreSQL  
 - iniciar o Redis  
