@@ -11,6 +11,9 @@ from .views import (
     HospitalAdmissionHistoricalFilterOptionsView,
     HospitalAdmissionHistoricalSummaryView,
     HospitalAdmissionHistoricalDashboardView,
+    RunHospitalOccupancyForecastManualView,
+    RunHospitalOccupancySimulationTestView,
+    HospitalOccupancyAdminView,
 )
 
 urlpatterns = [
@@ -63,5 +66,20 @@ urlpatterns = [
         "hospital-admissions/historical/dashboard/",
         HospitalAdmissionHistoricalDashboardView.as_view(),
         name="hospital-admission-historical-dashboard",
+    ),
+    path(
+        "hospital-occupancy-admin/",
+        HospitalOccupancyAdminView.as_view(),
+        name="hospital-occupancy-admin",
+    ),
+    path(
+        "hospital-occupancy-forecast/run-manual/",
+        RunHospitalOccupancyForecastManualView.as_view(),
+        name="run-hospital-occupancy-forecast-manual",
+    ),
+    path(
+        "hospital-occupancy-forecast/run-simulation-test/",
+        RunHospitalOccupancySimulationTestView.as_view(),
+        name="run-hospital-occupancy-simulation-test",
     ),
 ]

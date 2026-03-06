@@ -16,6 +16,9 @@ from rest_framework.views import APIView
 from sih.tasks import run_hospital_occupancy_forecast
 from .models import HospitalAdmission, HospitalOccupancyPrediction
 
+import os
+from django.http import FileResponse
+
 def _parse_date(value: str):
     v = (value or "").strip()
     if not v:
@@ -570,4 +573,76 @@ class HospitalAdmissionHistoricalDashboardView(TemplateView):
         context["historical_summary_url"] = reverse("hospital-admission-historical-summary")
         context["forecast_dashboard_url"] = reverse("hospital-occupancy-dashboard")
         context["historical_dashboard_url"] = reverse("hospital-admission-historical-dashboard")
+        return context
+    
+
+class RunHospitalOccupancyForecastManualView(APIView):
+
+    def post(self, request):
+        payload = {
+            "start_date": request.data.get("start_date"),
+            "horizon_days": int(request.data.get("horizon_days", 30)),
+            "date_init": request.data.get("date_init"),
+            "date_end": request.data.get("date_end"),
+            "date_de_teste": request.data.get("date_de_teste"),
+            "min_weeks": int(request.data.get("min_weeks", 20)),
+            "csv_out": request.data.get("csv_out", "/app/models/hospital_forecast_next_30d.csv"),
+            "model_out": request.data.get("model_out", "/app/models/hospital_occupancy.joblib"),
+        }
+
+        result = run_hospital_occupancy_forecast(**payload)
+        return Response(result, status=status.HTTP_200_OK)
+
+
+class RunHospitalOccupancySimulationTestView(APIView):
+
+    def post(self, request):
+        csv_path = "/app/models/hospital_test_2024.csv"
+
+        try:
+            result = run_hospital_occupancy_forecast(
+                date_init="2021-01-01",
+                date_end="2024-12-31",
+                date_de_teste="2024-01-01",
+                min_weeks=20,
+                csv_out=csv_path,
+                model_out="/app/models/hospital_occupancy.joblib",
+            )
+        except Exception as exc:
+            return Response(
+                {
+                    "detail": "Error while running hospital occupancy simulation test.",
+                    "error": str(exc),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        if not result.get("ok"):
+            return Response(result, status=status.HTTP_400_BAD_REQUEST)
+
+        if not os.path.exists(csv_path):
+            return Response(
+                {
+                    "detail": "The test finished but the CSV file was not generated.",
+                    "result": result,
+                    "expected_csv_path": csv_path,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return FileResponse(
+            open(csv_path, "rb"),
+            as_attachment=True,
+            filename="hospital_test_2024.csv",
+            content_type="text/csv",
+        )
+
+class HospitalOccupancyAdminView(TemplateView):
+    template_name = "sih/hospital_occupancy_admin.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["hospital_import_url"] = reverse("hospital-admission-import-csv")
+        context["run_manual_forecast_url"] = reverse("run-hospital-occupancy-forecast-manual")
+        context["run_simulation_test_url"] = reverse("run-hospital-occupancy-simulation-test")
         return context
