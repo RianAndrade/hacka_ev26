@@ -3,7 +3,6 @@
 
 O sistema utiliza **dados históricos de internações** para gerar **análises e previsões de ocupação hospitalar**. Além das previsões, a plataforma também oferece **dashboards com dados de anos anteriores**, permitindo que gestores identifiquem padrões históricos e tomem decisões mais informadas sobre planejamento de capacidade e distribuição de recursos.
 
-O projeto foi desenvolvido durante um **hackathon**, com foco em execução rápida, testes práticos e visualização clara dos resultados.
 ---
 
 # 🚀 Funcionalidades do sistema
