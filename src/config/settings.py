@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'sinan',
     'inmet',
     'arbovirus',
+    'sih',
 ]
 
 MIDDLEWARE = [
