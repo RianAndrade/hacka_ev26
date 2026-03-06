@@ -414,8 +414,8 @@ def _build_future_feature_row(
 
     seasonal_week_mean_admissions = _fallback_stat(
         seasonal_info["seasonal_adm_last_year"],
-        seasonal_info["seasonal_adm_strict"],
         seasonal_info["seasonal_adm_window"],
+        seasonal_info["seasonal_adm_strict"],
         recent_mean_8,
         hist_adm_mean,
         last_adm,
@@ -431,8 +431,8 @@ def _build_future_feature_row(
 
     seasonal_week_mean_los = _fallback_stat(
         seasonal_info["seasonal_los_last_year"],
-        seasonal_info["seasonal_los_strict"],
         seasonal_info["seasonal_los_window"],
+        seasonal_info["seasonal_los_strict"],
         recent_los_mean_8,
         hist_los_mean,
         last_los,
@@ -442,6 +442,21 @@ def _build_future_feature_row(
         _safe_quantile(same_week_hist["avg_length_of_stay_days"], 0.50),
         seasonal_info["seasonal_los_last_year"],
         seasonal_info["seasonal_los_window"],
+        seasonal_week_mean_los,
+        default=0.0,
+    )
+
+    last_year_same_week_adm = _fallback_stat(
+        seasonal_info["seasonal_adm_last_year"],
+        seasonal_info["seasonal_adm_window"],
+        seasonal_info["seasonal_adm_strict"],
+        seasonal_week_mean_admissions,
+        default=0.0,
+    )
+    last_year_same_week_los = _fallback_stat(
+        seasonal_info["seasonal_los_last_year"],
+        seasonal_info["seasonal_los_window"],
+        seasonal_info["seasonal_los_strict"],
         seasonal_week_mean_los,
         default=0.0,
     )
@@ -556,6 +571,8 @@ def _build_future_feature_row(
         "seasonal_week_median_admissions": seasonal_week_median_admissions,
         "seasonal_week_mean_los": seasonal_week_mean_los,
         "seasonal_week_median_los": seasonal_week_median_los,
+        "last_year_same_week_adm": last_year_same_week_adm,
+        "last_year_same_week_los": last_year_same_week_los,
         "hospital_mean_admissions": hospital_mean_admissions,
         "hospital_median_admissions": hospital_median_admissions,
         "hospital_min_admissions": hospital_min_admissions,
@@ -861,6 +878,37 @@ def _add_features(df: pd.DataFrame, min_weeks: int) -> pd.DataFrame:
 
     df = _add_hospital_stats(df)
 
+    last_year_lookup = df[
+        [
+            "health_facility_registry_code",
+            "year",
+            "week",
+            "admissions_count",
+            "avg_length_of_stay_days",
+        ]
+    ].copy()
+
+    last_year_lookup["year"] = last_year_lookup["year"] + 1
+    last_year_lookup = last_year_lookup.rename(
+        columns={
+            "admissions_count": "last_year_same_week_adm",
+            "avg_length_of_stay_days": "last_year_same_week_los",
+        }
+    )
+
+    df = df.merge(
+        last_year_lookup,
+        on=["health_facility_registry_code", "year", "week"],
+        how="left",
+    )
+
+    df["last_year_same_week_adm"] = df["last_year_same_week_adm"].fillna(
+        df["seasonal_week_mean_admissions"]
+    )
+    df["last_year_same_week_los"] = df["last_year_same_week_los"].fillna(
+        df["seasonal_week_mean_los"]
+    )
+
     counts = df.groupby(group)["week_start"].nunique()
     keep = counts[counts >= min_weeks].index
     df = df[df[group].isin(keep)].copy()
@@ -939,6 +987,8 @@ def _training_feature_cols():
         "seasonal_week_median_admissions",
         "seasonal_week_mean_los",
         "seasonal_week_median_los",
+        "last_year_same_week_adm",
+        "last_year_same_week_los",
         "hospital_mean_admissions",
         "hospital_median_admissions",
         "hospital_min_admissions",
@@ -1089,12 +1139,14 @@ def _peak_signal(feature_row: dict):
     recent_max_4 = feature_row.get("recent_max_4")
     seasonal = feature_row.get("seasonal_week_mean_admissions")
     hospital_mean = feature_row.get("hospital_mean_admissions")
+    last_year_same_week_adm = feature_row.get("last_year_same_week_adm")
 
     signal = 0.0
-    signal += 0.40 * max((_safe_div_value(last_1, recent_8) or 1.0) - 1.0, 0.0)
-    signal += 0.35 * max((_safe_div_value(recent_max_4, recent_8) or 1.0) - 1.0, 0.0)
+    signal += 0.30 * max((_safe_div_value(last_1, recent_8) or 1.0) - 1.0, 0.0)
+    signal += 0.30 * max((_safe_div_value(recent_max_4, recent_8) or 1.0) - 1.0, 0.0)
     signal += 0.25 * max((_safe_div_value(seasonal, hospital_mean) or 1.0) - 1.0, 0.0)
-    return float(min(max(signal, 0.0), 1.0))
+    signal += 0.15 * max((_safe_div_value(last_year_same_week_adm, recent_8) or 1.0) - 1.0, 0.0)
+    return float(min(max(signal, 0.0), 1.2))
 
 
 def _predict_small_hospital(feature_row: dict, hospital_hist: pd.DataFrame):
@@ -1160,11 +1212,11 @@ def _predict_medium_hospital(
     hist_max = feature_row.get("hospital_max_admissions") or pred_main
 
     pred = (
-        0.35 * pred_main
-        + 0.15 * recent_4
+        0.28 * pred_main
+        + 0.20 * recent_4
         + 0.10 * recent_8
         + 0.30 * seasonal
-        + 0.10 * seasonal_median
+        + 0.12 * seasonal_median
     )
 
     floor = max(
@@ -1178,9 +1230,9 @@ def _predict_medium_hospital(
     ceiling = max(
         (q90 * 1.18) if q90 is not None else 0.0,
         recent_max_4 * 1.15,
-        recent_max_8 * 1.12,
-        hist_max * 1.08,
-        seasonal * 1.22,
+        recent_max_8 * 1.35,
+        hist_max * 1.25,
+        seasonal * 1.45,
     )
 
     pred = min(max(pred, floor), ceiling)
@@ -1209,14 +1261,15 @@ def _predict_large_hospital(
     peak_signal = _peak_signal(feature_row)
 
     pred = (
-        0.38 * pred_main
+        0.22 * pred_main
+        + 0.32 * pred_high
         + 0.12 * recent_4
         + 0.08 * recent_8
-        + 0.30 * seasonal
-        + 0.12 * seasonal_median
+        + 0.16 * seasonal
+        + 0.10 * seasonal_median
     )
 
-    pred += peak_signal * 0.28 * max(pred_high - pred, 0.0)
+    pred += peak_signal * 0.60 * max(pred_high - pred, 0.0)
 
     floor = max(
         last_1 * 0.80,
@@ -1227,11 +1280,11 @@ def _predict_large_hospital(
     )
 
     ceiling = max(
-        (q95 * 1.18) if q95 is not None else 0.0,
-        recent_max_4 * 1.16,
-        recent_max_8 * 1.14,
-        hist_max * 1.08,
-        seasonal * 1.22,
+        (q95 * 1.38) if q95 is not None else 0.0,
+        recent_max_4 * 1.30,
+        recent_max_8 * 1.40,
+        hist_max * 1.30,
+        seasonal * 1.45,
     )
 
     pred = min(max(pred, floor), ceiling)
@@ -1260,14 +1313,15 @@ def _predict_very_large_hospital(
     peak_signal = _peak_signal(feature_row)
 
     pred = (
-        0.34 * pred_main
-        + 0.14 * recent_4
-        + 0.08 * recent_8
-        + 0.32 * seasonal
-        + 0.12 * seasonal_median
+        0.10 * pred_main
+        + 0.48 * pred_high
+        + 0.10 * recent_4
+        + 0.07 * recent_8
+        + 0.15 * seasonal
+        + 0.10 * seasonal_median
     )
 
-    pred += peak_signal * 0.32 * max(pred_high - pred, 0.0)
+    pred += peak_signal * 0.90 * max(pred_high - pred, 0.0)
 
     floor = max(
         last_1 * 0.82,
@@ -1278,11 +1332,11 @@ def _predict_very_large_hospital(
     )
 
     ceiling = max(
-        (q95 * 1.20) if q95 is not None else 0.0,
-        recent_max_4 * 1.18,
-        recent_max_8 * 1.15,
-        hist_max * 1.10,
-        seasonal * 1.24,
+        (q95 * 1.60) if q95 is not None else 0.0,
+        recent_max_4 * 1.45,
+        recent_max_8 * 1.58,
+        hist_max * 1.50,
+        seasonal * 1.65,
     )
 
     pred = min(max(pred, floor), ceiling)

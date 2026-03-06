@@ -1,5 +1,5 @@
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -7,12 +7,12 @@ from rest_framework import status
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from sih.tasks import run_hospital_occupancy_forecast
 from celery.result import AsyncResult
-from .models import HospitalAdmission
 
 from sih.tasks import run_hospital_occupancy_forecast
-
+from .models import HospitalAdmission, HospitalOccupancyPrediction
+from django.urls import reverse
+from django.views.generic import TemplateView
 
 def _parse_date(value: str):
     v = (value or "").strip()
@@ -112,9 +112,9 @@ class HospitalAdmissionCsvImportView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        BATCH_SIZE = 2000
-        for i in range(0, len(objects), BATCH_SIZE):
-            batch = objects[i : i + BATCH_SIZE]
+        batch_size = 2000
+        for i in range(0, len(objects), batch_size):
+            batch = objects[i:i + batch_size]
             HospitalAdmission.objects.bulk_create(batch, ignore_conflicts=True)
             created += len(batch)
 
@@ -149,7 +149,6 @@ class HospitalOccupancyForecastStatusView(APIView):
             payload["error"] = str(res.result)
 
         return Response(payload, status=status.HTTP_200_OK)
-    
 
 
 class HospitalOccupancyForecastView(APIView):
@@ -178,3 +177,90 @@ class HospitalOccupancyForecastView(APIView):
             {"task_id": task.id, "status": "queued"},
             status=status.HTTP_202_ACCEPTED,
         )
+
+
+class HospitalOccupancyPredictionByHospitalView(APIView):
+
+    def get(self, request):
+        hospital = (request.query_params.get("hospital") or "").strip()
+        horizon_days = request.query_params.get("horizon_days", "30").strip()
+        start_date_raw = (request.query_params.get("start_date") or "").strip()
+
+        if not hospital:
+            return Response(
+                {"detail": "Query param 'hospital' is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if horizon_days not in {"30", "60", "90"}:
+            return Response(
+                {"detail": "Query param 'horizon_days' must be one of: 30, 60, 90."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if start_date_raw:
+            start_date = _parse_date(start_date_raw)
+            if not start_date:
+                return Response(
+                    {"detail": "Invalid 'start_date'. Use YYYY-MM-DD, DD/MM/YYYY or YYYYMMDD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            start_date = datetime.today().date()
+
+        end_date = start_date + timedelta(days=int(horizon_days))
+
+        queryset = (
+            HospitalOccupancyPrediction.objects
+            .filter(
+                hospital__iexact=hospital,
+                week_start__gte=start_date,
+                week_start__lte=end_date,
+            )
+            .order_by("week_start")
+        )
+
+        predictions = {}
+        for item in queryset:
+            predictions[item.week_start.isoformat()] = {
+                "estimated_total": item.estimated_total,
+                "estimated_avg_length_of_stay": item.estimated_avg_length_of_stay,
+            }
+
+        return Response(
+            {
+                "hospital": hospital,
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+                "horizon_days": int(horizon_days),
+                "weeks": predictions,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+class HospitalOccupancyAvailableHospitalsView(APIView):
+
+    def get(self, request):
+        hospitals = (
+            HospitalOccupancyPrediction.objects
+            .order_by("hospital")
+            .values_list("hospital", flat=True)
+            .distinct()
+        )
+
+        return Response(
+            {
+                "count": len(hospitals),
+                "results": list(hospitals),
+            },
+            status=status.HTTP_200_OK,
+        )
+    
+class HospitalOccupancyDashboardView(TemplateView):
+    template_name = "sih/hospital_occupancy_dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["available_hospitals_url"] = reverse("hospital-occupancy-hospitals")
+        context["predictions_url"] = reverse("hospital-occupancy-predictions")
+        return context
